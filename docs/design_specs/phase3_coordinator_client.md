@@ -26,7 +26,7 @@ class RadioRAClientWrapper:
     ) -> None: ...
 
     # --- Lifecycle ---
-    async def connect(self) -> None: ...
+    async def connect(self) -> None: ...     # transport + read loop + PON (command-ready)
     async def start(self) -> None: ...       # connect + monitoring + initial state query
     async def stop(self) -> None: ...        # stop monitoring + disconnect
     async def start_polling(self, interval: float) -> None: ...
@@ -72,6 +72,8 @@ Per RadioRA Classic spec (044-038a), the device uses software flow control via t
 - Commands sent before the `!` prompt are **silently ignored**
 - This is handled at the `pyradiora_classic.RadioRAClient` layer (command lock + prompt gating)
 - The HA wrapper does NOT need additional sequencing -- the underlying library guarantees delivery
+- `connect()` bootstraps the protocol (read loop + PON command) so the client is command-ready immediately after it returns. Consumers never need to interact with PON or prompt gating directly.
+- `start()` layers monitoring + initial state query on top of `connect()` for long-running consumers.
 - Impact: each command takes ~50ms round-trip (prompt wait). Sequential monitoring setup takes ~200ms total on connect. This is acceptable for RS-232 protocol constraints.
 
 ---

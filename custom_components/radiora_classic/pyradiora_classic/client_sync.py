@@ -166,6 +166,12 @@ class RadioRAClientSync:
         self._send(commands.enable_monitoring(MonitorType.BUTTON_PRESS))
         self._send(commands.enable_monitoring(MonitorType.ZONE_MAP))
 
+    def disable_monitoring(self) -> None:
+        """Disable all monitoring."""
+        self._send(commands.disable_monitoring(MonitorType.ZONE_CHANGE))
+        self._send(commands.disable_monitoring(MonitorType.BUTTON_PRESS))
+        self._send(commands.disable_monitoring(MonitorType.ZONE_MAP))
+
     def read_message(self, timeout: float | None = None) -> AnyMessage | None:
         """Block and read next message from controller.
 

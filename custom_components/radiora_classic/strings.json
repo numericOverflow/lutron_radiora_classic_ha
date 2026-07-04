@@ -22,12 +22,20 @@
       },
       "name_zones": {
         "title": "Configure Zones",
-        "description": "Name and configure each selected zone.",
+        "description": "Configure zone {zone_number}.",
         "data": {
           "name": "Name",
           "mode": "Mode",
           "area": "Area",
           "fade_sec": "Fade Time (seconds)"
+        }
+      },
+      "ask_identify": {
+        "title": "Zone Identification",
+        "description": "Each zone will gently fade on and off so you can see which fixture it controls.",
+        "data": {
+          "auto_flash": "Flash zone(s) to identify during setup?",
+          "flash_duration": "Flash duration per zone (seconds)"
         }
       },
       "reconfigure": {
@@ -70,13 +78,23 @@
         "title": "Manage Zones",
         "menu_options": {
           "add_zone": "Add Zone",
+          "identify_add_zone": "Flash Zone Lights To Identify",
           "select_edit_zone": "Edit Zone",
           "remove_zone": "Remove Zone"
         }
       },
+      "identify_add_zone": {
+        "title": "Flash Zone Lights To Identify",
+        "description": "Enter a zone number to gently fade its lights on and off.",
+        "data": {
+          "zone": "Zone Number (1-32)",
+          "flash_duration": "Flash duration (seconds)",
+          "system": "System"
+        }
+      },
       "add_zone": {
         "title": "Add Zone",
-        "description": "Already configured: {configured_zones}",
+        "description": "Already configured:\n{configured_zones}",
         "data": {
           "zone": "Zone Number (1-32)",
           "name": "Name",
@@ -183,6 +201,9 @@
         "title": "Controller Settings",
         "data": {
           "poll_interval": "Poll Interval (seconds)"
+        },
+        "data_description": {
+          "poll_interval": "Reconciliation heartbeat. 0 = disabled (push only)."
         }
       },
       "import_csv": {
@@ -209,12 +230,21 @@
       },
       "name_rediscovered_zone": {
         "title": "Configure Zone {zone_number} ({current}/{total})",
+        "description": "Configure zone {zone_number}.",
         "data": {
           "name": "Name",
           "mode": "Mode",
           "area": "Area",
           "system": "System",
           "fade_sec": "Fade Time (seconds)"
+        }
+      },
+      "ask_identify_rediscover": {
+        "title": "Zone Identification",
+        "description": "Each zone will gently fade on and off so you can see which fixture it controls.",
+        "data": {
+          "auto_flash": "Flash zone(s) to identify during setup?",
+          "flash_duration": "Flash duration per zone (seconds)"
         }
       },
       "query_firmware_version": {

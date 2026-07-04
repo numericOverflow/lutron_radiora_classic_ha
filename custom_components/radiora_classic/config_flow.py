@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
@@ -49,6 +50,9 @@ from .pyradiora_classic import (
     System,
 )
 
+if TYPE_CHECKING:
+    from .coordinator import RadioRACoordinator
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -60,6 +64,57 @@ async def _try_connection(url: str, bridged: bool) -> None:
         await client.get_version()
     finally:
         await client.disconnect()
+
+
+async def _flash_zone(url: str, zone: int, system: System = System.NONE, duration: int = 5) -> None:
+    """Flash a zone on/off to help user identify it physically.
+
+    Used during initial config flow when no coordinator is running.
+    Creates a temporary client and tears it down immediately.
+    Uses gentle 1-second fades so dimmers ramp smoothly.
+    """
+    from .pyradiora_classic.commands import set_dimmer_level
+
+    fade_sec = 1
+    cycle_time = fade_sec * 2  # one fade up + one fade down
+    cycles = max(1, duration // cycle_time)
+
+    client = RadioRAClient(url=url, bridged=(system != System.NONE))
+    try:
+        await client.connect()
+        for _ in range(cycles):
+            await client._send(set_dimmer_level(zone, 100, fade_sec=fade_sec, system=system))
+            await asyncio.sleep(fade_sec)
+            await client._send(set_dimmer_level(zone, 0, fade_sec=fade_sec, system=system))
+            await asyncio.sleep(fade_sec)
+        # Leave light on
+        await client._send(set_dimmer_level(zone, 100, fade_sec=fade_sec, system=system))
+    finally:
+        await client.disconnect()
+
+
+async def _flash_zone_via_coordinator(
+    coordinator: "RadioRACoordinator", zone: int, system: System = System.NONE, duration: int = 5
+) -> None:
+    """Flash a zone using an already-running coordinator's client.
+
+    Used during options flow when the coordinator is active.
+    No extra connection — commands go through the existing queued pipeline.
+    Uses gentle 1-second fades so dimmers ramp smoothly.
+    """
+    from .pyradiora_classic.commands import set_dimmer_level
+
+    fade_sec = 1
+    cycle_time = fade_sec * 2
+    cycles = max(1, duration // cycle_time)
+
+    for _ in range(cycles):
+        await coordinator.async_send_raw(set_dimmer_level(zone, 100, fade_sec=fade_sec, system=system))
+        await asyncio.sleep(fade_sec)
+        await coordinator.async_send_raw(set_dimmer_level(zone, 0, fade_sec=fade_sec, system=system))
+        await asyncio.sleep(fade_sec)
+    # Leave light on
+    await coordinator.async_send_raw(set_dimmer_level(zone, 100, fade_sec=fade_sec, system=system))
 
 
 async def _discover_zones(url: str, bridged: bool) -> list[dict[str, Any]]:
@@ -98,6 +153,8 @@ class RadioRAClassicConfigFlow(ConfigFlow, domain=DOMAIN):
         self._selected_zones: list[int] = []
         self._zone_configs: list[dict[str, Any]] = []
         self._current_zone_index: int = 0
+        self._auto_flash: bool = False
+        self._flash_duration: int = 5
 
     @staticmethod
     @callback
@@ -168,7 +225,7 @@ class RadioRAClassicConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._selected_zones = [int(z) for z in selected]
                 self._current_zone_index = 0
                 self._zone_configs = []
-                return await self.async_step_name_zones()
+                return await self.async_step_ask_identify()
             # No zones selected — create entry with empty zones
             return self._create_entry()
 
@@ -219,12 +276,7 @@ class RadioRAClassicConfigFlow(ConfigFlow, domain=DOMAIN):
         """Name and configure each selected zone sequentially."""
         if user_input is not None:
             zone_num = self._selected_zones[self._current_zone_index]
-            # Find system for this zone from discovery
-            system = None
-            for z in self._discovered_zones:
-                if z["zone"] == zone_num:
-                    system = z.get("system")
-                    break
+            system = self._get_zone_system(zone_num)
 
             config: dict[str, Any] = {
                 "zone": zone_num,
@@ -242,7 +294,18 @@ class RadioRAClassicConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_name_zones()
             return self._create_entry()
 
+        # Flash zone if user opted in
         zone_num = self._selected_zones[self._current_zone_index]
+        if self._auto_flash:
+            system = self._get_zone_system(zone_num)
+            try:
+                await _flash_zone(
+                    self._url, zone_num,
+                    System(int(system)) if system else System.NONE,
+                    duration=self._flash_duration,
+                )
+            except (RadioRAConnectionError, RadioRATimeoutError, OSError, asyncio.TimeoutError):
+                _LOGGER.debug("Auto-flash failed for zone %s", zone_num)
 
         return self.async_show_form(
             step_id="name_zones",
@@ -264,6 +327,32 @@ class RadioRAClassicConfigFlow(ConfigFlow, domain=DOMAIN):
             }),
             description_placeholders={"zone_number": str(zone_num)},
         )
+
+    async def async_step_ask_identify(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask user if they want zones to auto-flash during setup."""
+        if user_input is not None:
+            self._auto_flash = user_input.get("auto_flash", False)
+            self._flash_duration = int(user_input.get("flash_duration", 5))
+            return await self.async_step_name_zones()
+
+        return self.async_show_form(
+            step_id="ask_identify",
+            data_schema=vol.Schema({
+                vol.Required("auto_flash", default=True): BooleanSelector(),
+                vol.Required("flash_duration", default=5): NumberSelector(
+                    NumberSelectorConfig(min=2, max=30, mode=NumberSelectorMode.BOX)
+                ),
+            }),
+        )
+
+    def _get_zone_system(self, zone_num: int) -> str | None:
+        """Look up system string for a zone from discovery data."""
+        for z in self._discovered_zones:
+            if z["zone"] == zone_num:
+                return z.get("system")
+        return None
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
@@ -437,6 +526,8 @@ class RadioRAOptionsFlow(OptionsFlow):
         self._edit_phantom: int | None = None
         self._edit_master: tuple[int, int] | None = None
         self._discovered_new_zones: list[dict[str, Any]] = []
+        self._auto_flash: bool = False
+        self._flash_duration: int = 5
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -464,7 +555,7 @@ class RadioRAOptionsFlow(OptionsFlow):
         """Zone management sub-menu."""
         return self.async_show_menu(
             step_id="manage_zones",
-            menu_options=["add_zone", "select_edit_zone", "remove_zone"],
+            menu_options=["identify_add_zone", "add_zone", "select_edit_zone", "remove_zone"],
         )
 
     async def async_step_add_zone(
@@ -524,8 +615,9 @@ class RadioRAOptionsFlow(OptionsFlow):
 
         # Show existing zones in description for context
         existing = self._entry.options.get(CONF_ZONES, [])
-        existing_summary = ", ".join(
-            f"{z['zone']}={z['name']}" for z in sorted(existing, key=lambda x: x["zone"])
+        existing_summary = "\n".join(
+            f"Zone {z['zone']}: {z['name']} ✓"
+            for z in sorted(existing, key=lambda x: x["zone"])
         )
 
         return self.async_show_form(
@@ -533,6 +625,50 @@ class RadioRAOptionsFlow(OptionsFlow):
             data_schema=vol.Schema(schema),
             errors=errors,
             description_placeholders={"configured_zones": existing_summary} if existing_summary else {},
+        )
+
+    async def async_step_identify_add_zone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Flash a zone by number to help identify it before adding."""
+        if user_input is not None:
+            zone_num = int(user_input["zone"]) if user_input.get("zone") else None
+            if zone_num:
+                system = user_input.get("system")
+                duration = int(user_input.get("flash_duration", 5))
+                try:
+                    coordinator = self._entry.runtime_data.coordinator
+                    await _flash_zone_via_coordinator(
+                        coordinator, zone_num,
+                        System(int(system)) if system else System.NONE,
+                        duration=duration,
+                    )
+                except (RadioRAConnectionError, RadioRATimeoutError, OSError, asyncio.TimeoutError):
+                    _LOGGER.debug("Flash identify failed for zone %s", zone_num)
+            return await self.async_step_add_zone()
+
+        schema: dict[Any, Any] = {
+            vol.Required("zone"): NumberSelector(
+                NumberSelectorConfig(min=1, max=32, mode=NumberSelectorMode.BOX)
+            ),
+            vol.Required("flash_duration", default=5): NumberSelector(
+                NumberSelectorConfig(min=2, max=30, mode=NumberSelectorMode.BOX)
+            ),
+        }
+        if self._entry.data.get(CONF_BRIDGED):
+            schema[vol.Optional("system")] = SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        {"value": "1", "label": "System 1"},
+                        {"value": "2", "label": "System 2"},
+                    ],
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            )
+
+        return self.async_show_form(
+            step_id="identify_add_zone",
+            data_schema=vol.Schema(schema),
         )
 
     async def async_step_select_edit_zone(
@@ -585,6 +721,12 @@ class RadioRAOptionsFlow(OptionsFlow):
             new_zones = [updated if z["zone"] == self._edit_zone else z for z in zones]
             return self._save_options({CONF_ZONES: new_zones})
 
+        fade_default = current.get("fade_sec")
+        fade_key = (
+            vol.Optional("fade_sec", default=fade_default)
+            if fade_default is not None
+            else vol.Optional("fade_sec")
+        )
         schema: dict[Any, Any] = {
             vol.Required("name", default=current["name"]): TextSelector(),
             vol.Optional("mode", default=current.get("mode", "dimmer")): SelectSelector(
@@ -597,9 +739,7 @@ class RadioRAOptionsFlow(OptionsFlow):
                 )
             ),
             vol.Optional("area", default=current.get("area") or ""): AreaSelector(),
-            vol.Optional(
-                "fade_sec", default=current.get("fade_sec")
-            ): NumberSelector(
+            fade_key: NumberSelector(
                 NumberSelectorConfig(min=0, max=240, mode=NumberSelectorMode.BOX)
             ),
         }
@@ -935,7 +1075,7 @@ class RadioRAOptionsFlow(OptionsFlow):
             step_id="controller_settings",
             data_schema=vol.Schema({
                 vol.Required("poll_interval", default=current_interval): NumberSelector(
-                    NumberSelectorConfig(min=5, max=300, mode=NumberSelectorMode.BOX)
+                    NumberSelectorConfig(min=0, max=86400, mode=NumberSelectorMode.BOX)
                 ),
             }),
         )
@@ -1054,11 +1194,11 @@ class RadioRAOptionsFlow(OptionsFlow):
         if user_input is not None:
             selected = [int(z) for z in user_input.get("selected_zones", [])]
             if selected:
-                # Store selections, proceed to naming flow
+                # Store selections, proceed to ask about identify then naming flow
                 self._rediscover_selected = selected
                 self._rediscover_zone_configs: list[dict[str, Any]] = []
                 self._rediscover_zone_index = 0
-                return await self.async_step_name_rediscovered_zone()
+                return await self.async_step_ask_identify_rediscover()
             return await self.async_step_init()
 
         # Build labels — new zones available for selection
@@ -1095,18 +1235,32 @@ class RadioRAOptionsFlow(OptionsFlow):
             description_placeholders={"existing_zones": description_text} if description_text else {},
         )
 
+    async def async_step_ask_identify_rediscover(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask user if they want zones to auto-flash during rediscovery setup."""
+        if user_input is not None:
+            self._auto_flash = user_input.get("auto_flash", False)
+            self._flash_duration = int(user_input.get("flash_duration", 5))
+            return await self.async_step_name_rediscovered_zone()
+
+        return self.async_show_form(
+            step_id="ask_identify_rediscover",
+            data_schema=vol.Schema({
+                vol.Required("auto_flash", default=True): BooleanSelector(),
+                vol.Required("flash_duration", default=5): NumberSelector(
+                    NumberSelectorConfig(min=2, max=30, mode=NumberSelectorMode.BOX)
+                ),
+            }),
+        )
+
     async def async_step_name_rediscovered_zone(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Name and configure each rediscovered zone sequentially."""
         if user_input is not None:
             zone_num = self._rediscover_selected[self._rediscover_zone_index]
-            # Find system for this zone from discovery
-            system = None
-            for z in self._discovered_new_zones:
-                if z["zone"] == zone_num:
-                    system = z.get("system")
-                    break
+            system = self._get_rediscover_zone_system(zone_num)
 
             config: dict[str, Any] = {
                 "zone": zone_num,
@@ -1129,6 +1283,19 @@ class RadioRAOptionsFlow(OptionsFlow):
             return self._save_options({CONF_ZONES: existing})
 
         zone_num = self._rediscover_selected[self._rediscover_zone_index]
+
+        # Flash zone if user opted in
+        if self._auto_flash:
+            system = self._get_rediscover_zone_system(zone_num)
+            try:
+                coordinator = self._entry.runtime_data.coordinator
+                await _flash_zone_via_coordinator(
+                    coordinator, zone_num,
+                    System(int(system)) if system else System.NONE,
+                    duration=self._flash_duration,
+                )
+            except (RadioRAConnectionError, RadioRATimeoutError, OSError, asyncio.TimeoutError):
+                _LOGGER.debug("Auto-flash failed for zone %s", zone_num)
 
         schema: dict[Any, Any] = {
             vol.Required("name", default=f"Zone {zone_num}"): TextSelector(),
@@ -1166,6 +1333,13 @@ class RadioRAOptionsFlow(OptionsFlow):
                 "total": str(len(self._rediscover_selected)),
             },
         )
+
+    def _get_rediscover_zone_system(self, zone_num: int) -> str | None:
+        """Look up system string for a zone from rediscovery data."""
+        for z in self._discovered_new_zones:
+            if z["zone"] == zone_num:
+                return z.get("system")
+        return None
 
     # --- Firmware Version Query ---
 

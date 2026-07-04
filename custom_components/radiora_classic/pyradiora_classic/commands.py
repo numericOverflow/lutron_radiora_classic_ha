@@ -45,29 +45,28 @@ def set_dimmer_level(
     fade_sec: int | None = None,
     system: System = System.NONE,
 ) -> str:
-    """Build SDL or SFA command depending on whether fade is specified.
+    """Build SDL (Set Dimmer Level) command.
 
     Args:
         zone: Zone number (1-32)
         level: Brightness 0 (off) to 100 (full)
-        fade_sec: If None or 0, uses SDL (instant). If >0, uses SFA (fade).
+        fade_sec: Optional fade time in seconds (1-240). If omitted, instant.
         system: System for bridged configurations
 
     Returns:
         Command string:
         - 'SDL,3,75' (instant, no fade)
         - 'SDL,3,75,S1' (instant, bridged system 1)
-        - 'SFA,3,75,5' (fade to 75% over 5 seconds)
-        - 'SFA,3,75,5,S2' (fade, bridged system 2)
+        - 'SDL,3,75,5' (fade to 75% over 5 seconds)
+        - 'SDL,3,75,5,S2' (fade, bridged system 2)
     """
     _validate_zone(zone)
     _validate_range(level, 0, MAX_DIMMER_LEVEL, "level")
 
+    parts: list[str] = ["SDL", str(zone), str(level)]
     if fade_sec is not None and fade_sec > 0:
         _validate_range(fade_sec, 1, MAX_FADE_SECONDS, "fade_sec")
-        parts: list[str] = ["SFA", str(zone), str(level), str(fade_sec)]
-    else:
-        parts = ["SDL", str(zone), str(level)]
+        parts.append(str(fade_sec))
 
     _append_system(parts, system)
     return ",".join(parts)
@@ -167,6 +166,11 @@ def version_inquiry() -> str:
 def enable_monitoring(monitor_type: MonitorType) -> str:
     """Build monitoring enable command (e.g. LZCMON, MBPMON, ZMPMON)."""
     return f"{monitor_type.value}ON"
+
+
+def disable_monitoring(monitor_type: MonitorType) -> str:
+    """Build monitoring disable command (e.g. LZCMOFF, MBPMOFF, ZMPMOFF)."""
+    return f"{monitor_type.value}OFF"
 
 
 def flash_on() -> str:

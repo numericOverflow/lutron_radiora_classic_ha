@@ -86,11 +86,18 @@ class RadioRAClient:
     # --- Connection Lifecycle ---
 
     async def connect(self) -> None:
-        """Connect to the RA-RS232 interface."""
+        """Connect to the RA-RS232 interface and bootstrap command readiness.
+
+        After connect() returns, the client is ready to send commands.
+        Starts the background read loop and enables '!' prompts (PON).
+        This is the minimum-viable entry point for any consumer.
+        """
         self._transport = await AsyncTransport.connect(self._url)
         self._connected_at = datetime.now(timezone.utc)
         self._parser.reset()
-        self._prompt_ready.set()  # Assume ready for first command after connect
+        self._prompt_ready.set()  # Assume ready initially
+        self._read_task = asyncio.create_task(self._read_loop())
+        await self._enable_prompts()
 
     async def disconnect(self) -> None:
         """Disconnect and stop all background tasks."""
@@ -118,15 +125,13 @@ class RadioRAClient:
             self._transport = None
 
     async def start(self) -> None:
-        """Connect + start read loop + enable monitoring.
+        """Connect + enable monitoring + query initial state.
 
         This is the typical entry point for long-running consumers (HA).
         Automatically reconnects on connection loss.
         """
         self._stopping = False
         await self.connect()
-        self._read_task = asyncio.create_task(self._read_loop())
-        await self._enable_prompts()
         await self.start_monitoring()
         await self._query_initial_state()
 
@@ -257,6 +262,12 @@ class RadioRAClient:
         await self._send(commands.enable_monitoring(MonitorType.ZONE_CHANGE))
         await self._send(commands.enable_monitoring(MonitorType.BUTTON_PRESS))
         await self._send(commands.enable_monitoring(MonitorType.ZONE_MAP))
+
+    async def stop_monitoring(self) -> None:
+        """Disable all monitoring."""
+        await self._send(commands.disable_monitoring(MonitorType.ZONE_CHANGE))
+        await self._send(commands.disable_monitoring(MonitorType.BUTTON_PRESS))
+        await self._send(commands.disable_monitoring(MonitorType.ZONE_MAP))
 
     # --- State Cache ---
 
@@ -487,15 +498,21 @@ class RadioRAClient:
             _LOGGER.info("Reconnecting in %.1fs...", self._reconnect_delay)
             await asyncio.sleep(self._reconnect_delay)
             try:
+                # Clean up old transport and read task before reconnecting
+                if self._read_task and not self._read_task.done():
+                    self._read_task.cancel()
+                    try:
+                        await self._read_task
+                    except asyncio.CancelledError:
+                        pass
                 if self._transport:
                     await self._transport.close()
+                    self._transport = None
                 await self.connect()
                 self._reconnect_count += 1
                 self._reconnect_delay = _RECONNECT_MIN_DELAY
                 _LOGGER.info("Reconnected successfully (count=%d)", self._reconnect_count)
-                # Re-enable monitoring and restart read loop
-                self._read_task = asyncio.create_task(self._read_loop())
-                await self._enable_prompts()
+                # Re-enable monitoring after reconnect (connect() handles read loop + PON)
                 await self.start_monitoring()
                 await self._query_initial_state()
                 return
