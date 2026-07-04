@@ -53,3 +53,15 @@ def test_extra_attributes(sensor, coordinator):
 def test_unique_id(sensor):
     """Unique ID should match spec."""
     assert sensor.unique_id == "radiora_classic.main_floor.sensor.connection"
+
+
+def test_device_info_includes_sw_version(coordinator, mock_radiora_client):
+    """DeviceInfo should include firmware version when available."""
+    coordinator._firmware_version = "M2.29 / S1.0"
+    sensor = RadioRAConnectionSensor(coordinator, "main_floor")
+    assert sensor.device_info["sw_version"] == "M2.29 / S1.0"
+
+
+def test_device_info_sw_version_none_when_not_queried(sensor):
+    """DeviceInfo sw_version should be None before first connect."""
+    assert sensor.device_info.get("sw_version") is None

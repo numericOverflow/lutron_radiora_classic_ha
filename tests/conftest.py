@@ -199,7 +199,6 @@ def mock_radiora_client():
         client.start_polling = AsyncMock()
         client.stop_polling = AsyncMock()
         client.start_monitoring = AsyncMock()
-        client.stop_monitoring = AsyncMock()
         client._send = AsyncMock()
 
         yield client

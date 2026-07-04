@@ -147,3 +147,17 @@ def test_device_info(dimmer_light):
     assert info["name"] == "Living Room"
     assert info["manufacturer"] == "Lutron"
     assert info["suggested_area"] == "Living Room"
+
+
+def test_unique_id_with_system_prefix(coordinator):
+    """Bridged S2 zone should include system in unique_id to avoid collisions."""
+    zone_config = {"zone": 1, "name": "S2 Zone 1", "mode": "dimmer", "system": 2}
+    light = RadioRALight(coordinator, "main_floor", zone_config)
+    assert light.unique_id == "radiora_classic.main_floor.s2.light.z1"
+    assert ("radiora_classic", "main_floor.s2.light.z1") in light.device_info["identifiers"]
+
+
+def test_unique_id_no_system_prefix_for_non_bridged(dimmer_light):
+    """Non-bridged zone should NOT have system prefix."""
+    assert "s" not in dimmer_light.unique_id.split("light")[0].split(".")[-1]
+    assert dimmer_light.unique_id == "radiora_classic.main_floor.light.z1"

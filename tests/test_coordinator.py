@@ -180,3 +180,31 @@ async def test_timeout_raises_update_failed(coordinator, mock_radiora_client):
     )
     with pytest.raises(UpdateFailed):
         await coordinator._async_update_data()
+
+
+async def test_firmware_version_queried_on_first_connect(coordinator, mock_radiora_client):
+    """Firmware version should be queried and cached on first connect."""
+    mock_radiora_client.connected = False
+    await coordinator._async_update_data()
+    mock_radiora_client.get_version.assert_called_once()
+    assert coordinator.firmware_version == "1.0 / 1.0"
+
+
+async def test_firmware_version_failure_non_fatal(coordinator, mock_radiora_client):
+    """Firmware version query failure should not break setup."""
+    mock_radiora_client.connected = False
+    mock_radiora_client.get_version = AsyncMock(
+        side_effect=RadioRATimeoutError("no response")
+    )
+    await coordinator._async_update_data()
+    assert coordinator.firmware_version is None
+
+
+async def test_lmp_timeout_non_fatal(coordinator, mock_radiora_client):
+    """LMP query timeout should not fail the entire poll."""
+    mock_radiora_client.get_led_map = AsyncMock(
+        side_effect=RadioRATimeoutError("no response")
+    )
+    # Should not raise -- LMP failure is caught internally
+    data = await coordinator._async_update_data()
+    assert data is not None
