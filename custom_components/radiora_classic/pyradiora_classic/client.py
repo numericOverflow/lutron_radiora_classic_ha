@@ -314,6 +314,7 @@ class RadioRAClient:
         """Send command string with CR terminator."""
         if not self._transport or not self._transport.connected:
             raise RadioRAConnectionLost("Not connected")
+        _LOGGER.debug("TX: %s", cmd)
         await self._transport.write((cmd + "\r").encode(ENCODING))
 
     async def _read_loop(self) -> None:
@@ -323,6 +324,7 @@ class RadioRAClient:
                 if not self._transport or not self._transport.connected:
                     break
                 data = await self._transport.readline()
+                _LOGGER.debug("RX: %s", data.decode("ascii", errors="replace").strip())
                 messages = self._parser.feed(data)
                 for msg in messages:
                     self._last_message_at = msg.timestamp
