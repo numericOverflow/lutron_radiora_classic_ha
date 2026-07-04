@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/numericOverflow/lutron_radiora_classic_ha/issues",
   "loggers": ["custom_components.radiora_classic"],
   "requirements": ["pyserial>=3.5", "pyserial-asyncio-fast>=0.11"],
-  "version": "1.0.0"
+  "version": "0.2.0"
 }
