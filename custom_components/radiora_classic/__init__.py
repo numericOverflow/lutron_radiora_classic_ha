@@ -102,6 +102,28 @@ async def _async_options_updated(
         if not device.identifiers & valid_ids:
             device_registry.async_remove_device(device.id)
 
+    # Sync area assignments for devices whose area changed in options
+    # AreaSelector stores area IDs directly — no name lookup needed
+    id_to_area: dict[tuple[str, str], str | None] = {}
+    for z in entry.options.get("zones", []):
+        system_prefix = f"s{z['system']}." if z.get("system") else ""
+        ident = (DOMAIN, f"{controller_id}.{system_prefix}light.z{z['zone']}")
+        id_to_area[ident] = z.get("area")
+    for b in entry.options.get("phantom_buttons", []):
+        ident = (DOMAIN, f"{controller_id}.phantom.b{b['button']}")
+        id_to_area[ident] = b.get("area")
+    for m in entry.options.get("master_controls", []):
+        ident = (DOMAIN, f"{controller_id}.master.mc{m['master_control']}.b{m['button']}")
+        id_to_area[ident] = m.get("area")
+
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+        for ident in device.identifiers:
+            if ident in id_to_area:
+                desired_area_id = id_to_area[ident]
+                if desired_area_id and device.area_id != desired_area_id:
+                    device_registry.async_update_device(device.id, area_id=desired_area_id)
+                break
+
     await hass.config_entries.async_reload(entry.entry_id)
 
 
