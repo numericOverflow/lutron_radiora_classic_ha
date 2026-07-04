@@ -147,9 +147,12 @@ class RadioRACoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for zm in zone_maps:
                 self._handle_zone_map(zm)
 
-            # Query phantom LED states
-            led_map = await self._client.get_led_map()
-            self._handle_led_map(led_map)
+            # Query phantom LED states (non-fatal if unsupported/no phantoms)
+            try:
+                led_map = await self._client.get_led_map()
+                self._handle_led_map(led_map)
+            except RadioRATimeoutError:
+                _LOGGER.debug("LMP query timed out (no phantom buttons configured?)")
 
         except RadioRAConnectionError as err:
             raise ConfigEntryNotReady(

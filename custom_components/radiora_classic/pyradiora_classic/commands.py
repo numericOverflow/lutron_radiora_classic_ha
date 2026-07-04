@@ -155,8 +155,8 @@ def zone_map_inquiry(system: System = System.NONE) -> str:
 
 
 def phantom_led_status() -> str:
-    """Build LMP command (request LED map)."""
-    return "LMP"
+    """Build LMPI command (LED Map Inquiry)."""
+    return "LMPI"
 
 
 def version_inquiry() -> str:
