@@ -1,0 +1,20 @@
+send_command:
+  fields:
+    controller_id:
+      required: true
+      selector:
+        text:
+      description: "Controller ID (from integration setup)"
+    command:
+      required: true
+      selector:
+        text:
+      description: "Raw RS-232 command string (e.g., 'SDL,3,75')"
+
+export_config:
+  fields:
+    controller_id:
+      required: true
+      selector:
+        text:
+      description: "Controller ID to export configuration for"

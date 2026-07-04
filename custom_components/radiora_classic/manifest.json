@@ -1,0 +1,13 @@
+{
+  "domain": "radiora_classic",
+  "name": "Lutron RadioRA Classic",
+  "codeowners": ["@numericOverflow"],
+  "config_flow": true,
+  "documentation": "https://github.com/numericOverflow/lutron_radiora_classic_ha",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/numericOverflow/lutron_radiora_classic_ha/issues",
+  "loggers": ["custom_components.radiora_classic"],
+  "requirements": ["pyserial>=3.5", "pyserial-asyncio-fast>=0.11"],
+  "version": "1.0.0"
+}

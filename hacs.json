@@ -1,0 +1,6 @@
+{
+  "name": "Lutron RadioRA Classic",
+  "render_readme": true,
+  "homeassistant": "2025.7.0",
+  "content_in_root": false
+}

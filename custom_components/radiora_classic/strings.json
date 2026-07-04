@@ -1,0 +1,236 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to RadioRA Classic",
+        "description": "Enter the connection details for your RA-RS232 interface.",
+        "data": {
+          "name": "Controller Name",
+          "url": "Connection URL",
+          "bridged": "Bridged (Chronos System Bridge)"
+        },
+        "data_description": {
+          "url": "socket://host:port, /dev/ttyUSB0, or rfc2217://host:port"
+        }
+      },
+      "discover_zones": {
+        "title": "Discovered Zones",
+        "description": "Select zones to configure. Toggle lights physically to identify them.",
+        "data": {
+          "selected_zones": "Zones"
+        }
+      },
+      "name_zones": {
+        "title": "Configure Zones",
+        "description": "Name and configure each selected zone.",
+        "data": {
+          "name": "Name",
+          "mode": "Mode",
+          "area": "Area",
+          "fade_sec": "Fade Time (seconds)"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Connection",
+        "description": "Update connection settings. Existing device configuration will be preserved.",
+        "data": {
+          "url": "Connection URL",
+          "bridged": "Bridged (Chronos System Bridge)"
+        }
+      }
+    },
+    "error": {
+      "connection_error": "Could not connect to RadioRA RS-232 interface",
+      "already_configured": "This device is already configured",
+      "duplicated_controller_id": "A controller with this name already exists",
+      "invalid_url": "Invalid connection URL",
+      "no_zones_found": "No assigned zones found on this system"
+    },
+    "abort": {
+      "already_configured": "This device is already configured",
+      "reconfigure_successful": "Connection updated successfully"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "RadioRA Classic Options",
+        "menu_options": {
+          "manage_zones": "Manage Zones",
+          "manage_phantom_buttons": "Manage Phantom Buttons",
+          "manage_master_controls": "Manage Master Controls",
+          "controller_settings": "Controller Settings",
+          "import_csv": "Import CSV",
+          "export_csv": "Export CSV",
+          "rediscover_zones": "Re-discover Zones"
+        }
+      },
+      "manage_zones": {
+        "title": "Manage Zones",
+        "menu_options": {
+          "add_zone": "Add Zone",
+          "select_edit_zone": "Edit Zone",
+          "remove_zone": "Remove Zone"
+        }
+      },
+      "add_zone": {
+        "title": "Add Zone",
+        "data": {
+          "zone": "Zone Number (1-32)",
+          "name": "Name",
+          "mode": "Mode",
+          "area": "Area",
+          "system": "System",
+          "fade_sec": "Fade Time (seconds)"
+        }
+      },
+      "select_edit_zone": {
+        "title": "Select Zone to Edit",
+        "data": {
+          "zone": "Zone"
+        }
+      },
+      "edit_zone": {
+        "title": "Edit Zone",
+        "data": {
+          "name": "Name",
+          "mode": "Mode",
+          "area": "Area",
+          "system": "System",
+          "fade_sec": "Fade Time (seconds)"
+        }
+      },
+      "remove_zone": {
+        "title": "Remove Zones",
+        "data": {
+          "zones": "Select zones to remove"
+        }
+      },
+      "manage_phantom_buttons": {
+        "title": "Manage Phantom Buttons",
+        "menu_options": {
+          "add_phantom": "Add Phantom Button",
+          "select_edit_phantom": "Edit Phantom Button",
+          "remove_phantom": "Remove Phantom Button"
+        }
+      },
+      "add_phantom": {
+        "title": "Add Phantom Button",
+        "data": {
+          "button": "Button Number (1-15)",
+          "name": "Name",
+          "area": "Area"
+        }
+      },
+      "select_edit_phantom": {
+        "title": "Select Phantom Button to Edit",
+        "data": {
+          "button": "Button"
+        }
+      },
+      "edit_phantom": {
+        "title": "Edit Phantom Button",
+        "data": {
+          "name": "Name",
+          "area": "Area"
+        }
+      },
+      "remove_phantom": {
+        "title": "Remove Phantom Buttons",
+        "data": {
+          "buttons": "Select buttons to remove"
+        }
+      },
+      "manage_master_controls": {
+        "title": "Manage Master Controls",
+        "menu_options": {
+          "add_master": "Add Master Control",
+          "select_edit_master": "Edit Master Control",
+          "remove_master": "Remove Master Control"
+        }
+      },
+      "add_master": {
+        "title": "Add Master Control",
+        "data": {
+          "master_control": "Master Control Number",
+          "button": "Button Number",
+          "name": "Name",
+          "area": "Area"
+        }
+      },
+      "select_edit_master": {
+        "title": "Select Master Control to Edit",
+        "data": {
+          "master": "Master Control"
+        }
+      },
+      "edit_master": {
+        "title": "Edit Master Control",
+        "data": {
+          "name": "Name",
+          "area": "Area"
+        }
+      },
+      "remove_master": {
+        "title": "Remove Master Controls",
+        "data": {
+          "masters": "Select master controls to remove"
+        }
+      },
+      "controller_settings": {
+        "title": "Controller Settings",
+        "data": {
+          "poll_interval": "Poll Interval (seconds)"
+        }
+      },
+      "import_csv": {
+        "title": "Import CSV",
+        "description": "Paste CSV content below. Format: type,number,name,mode,area,system,fade_sec",
+        "data": {
+          "csv_content": "CSV Content"
+        }
+      },
+      "export_csv": {
+        "title": "Export CSV",
+        "description": "Copy the configuration below:"
+      },
+      "rediscover_zones": {
+        "title": "Re-discover Zones",
+        "description": "Scanning for unconfigured zones..."
+      },
+      "rediscover_results": {
+        "title": "Discovered Zones",
+        "description": "Select new zones to configure:",
+        "data": {
+          "selected_zones": "Zones"
+        }
+      }
+    },
+    "error": {
+      "duplicated_zone": "This zone is already configured",
+      "duplicated_button": "This button is already configured",
+      "duplicated_master": "This master control button is already configured",
+      "invalid_url": "Invalid connection URL",
+      "no_zones_found": "No new unconfigured zones found",
+      "no_devices_in_csv": "No valid devices found in CSV",
+      "csv_too_large": "CSV content is too large (max 500KB)",
+      "csv_validation_failed": "CSV validation failed:\n\n{error_details}",
+      "connection_error": "Could not connect to RadioRA RS-232 interface"
+    }
+  },
+  "services": {
+    "send_command": {
+      "name": "Send Command",
+      "description": "Send a raw RS-232 command to the RadioRA controller."
+    },
+    "export_config": {
+      "name": "Export Config",
+      "description": "Export device configuration to a CSV file."
+    }
+  },
+  "exceptions": {
+    "controller_not_found": {
+      "message": "Controller '{controller_id}' not found"
+    }
+  }
+}
