@@ -8,6 +8,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers import device_registry as dr
 
 from .const import (
     CONF_BRIDGED,
@@ -78,7 +79,29 @@ async def async_unload_entry(hass: HomeAssistant, entry: RadioRAConfigEntry) -> 
 async def _async_options_updated(
     hass: HomeAssistant, entry: RadioRAConfigEntry
 ) -> None:
-    """Reload entry when options change."""
+    """Remove orphaned devices and reload entry when options change."""
+    device_registry = dr.async_get(hass)
+    controller_id = entry.options[CONF_CONTROLLER_ID]
+
+    # Build set of device identifiers that should exist based on current options
+    valid_ids: set[tuple[str, str]] = set()
+    for z in entry.options.get("zones", []):
+        system_prefix = f"s{z['system']}." if z.get("system") else ""
+        valid_ids.add((DOMAIN, f"{controller_id}.{system_prefix}light.z{z['zone']}"))
+    for b in entry.options.get("phantom_buttons", []):
+        valid_ids.add((DOMAIN, f"{controller_id}.phantom.b{b['button']}"))
+    for m in entry.options.get("master_controls", []):
+        valid_ids.add((DOMAIN, f"{controller_id}.master.mc{m['master_control']}.b{m['button']}"))
+    # Permanent devices (always exist)
+    valid_ids.add((DOMAIN, f"{controller_id}.button.all_on"))
+    valid_ids.add((DOMAIN, f"{controller_id}.button.all_off"))
+    valid_ids.add((DOMAIN, f"{controller_id}.controller"))
+
+    # Remove devices whose identifiers are no longer valid
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+        if not device.identifiers & valid_ids:
+            device_registry.async_remove_device(device.id)
+
     await hass.config_entries.async_reload(entry.entry_id)
 
 
