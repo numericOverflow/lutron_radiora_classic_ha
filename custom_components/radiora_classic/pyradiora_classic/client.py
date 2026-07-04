@@ -126,6 +126,7 @@ class RadioRAClient:
         self._stopping = False
         await self.connect()
         self._read_task = asyncio.create_task(self._read_loop())
+        await self._enable_prompts()
         await self.start_monitoring()
         await self._query_initial_state()
 
@@ -316,6 +317,30 @@ class RadioRAClient:
 
     # --- Internals ---
 
+    async def _enable_prompts(self) -> None:
+        """Send PON to ensure '!' prompts are enabled.
+
+        This is a bootstrap command -- we bypass _send() because prompts
+        may not yet be enabled (so we can't gate on a prompt that might
+        not exist). After PON is processed, the device will send '!' for
+        all subsequent commands.
+        """
+        if not self._transport or not self._transport.connected:
+            return
+        _LOGGER.debug("TX: PON (bootstrap)")
+        await self._transport.write(b"PON\r")
+        # Wait briefly for the device to process and send '!'
+        # If prompts were already on, we get '!' back. If they were off,
+        # PON enables them but this particular command may not get one.
+        # Either way, give the read loop time to pick up the banner + prompt.
+        try:
+            await asyncio.wait_for(self._prompt_ready.wait(), timeout=2.0)
+        except asyncio.TimeoutError:
+            # No prompt received -- that's OK, prompts are now enabled
+            # for subsequent commands. Set ready so first _send() proceeds.
+            self._prompt_ready.set()
+            _LOGGER.debug("No prompt after PON (expected if prompts were off)")
+
     async def _send(self, cmd: str) -> None:
         """Wait for device ready, then send command.
 
@@ -480,6 +505,7 @@ class RadioRAClient:
                 _LOGGER.info("Reconnected successfully (count=%d)", self._reconnect_count)
                 # Re-enable monitoring and restart read loop
                 self._read_task = asyncio.create_task(self._read_loop())
+                await self._enable_prompts()
                 await self.start_monitoring()
                 await self._query_initial_state()
                 return

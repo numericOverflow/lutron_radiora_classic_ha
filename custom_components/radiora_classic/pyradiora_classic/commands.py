@@ -182,3 +182,13 @@ def flash_on() -> str:
 def flash_off() -> str:
     """Build SFM,17,OFF (stop flash)."""
     return f"SFM,{BUTTON_ALL_OFF},OFF"
+
+
+def prompt_on() -> str:
+    """Build PON command (enable '!' ready prompts)."""
+    return "PON"
+
+
+def prompt_off() -> str:
+    """Build POFF command (disable '!' ready prompts)."""
+    return "POFF"

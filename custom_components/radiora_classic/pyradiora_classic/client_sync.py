@@ -46,8 +46,9 @@ class RadioRAClientSync:
     # --- Connection ---
 
     def connect(self) -> None:
-        """Connect to RA-RS232."""
+        """Connect to RA-RS232 and enable prompts."""
         self._transport.connect()
+        self._enable_prompts()
 
     def disconnect(self) -> None:
         """Disconnect."""
@@ -190,6 +191,25 @@ class RadioRAClientSync:
         return self._transport.read_line()
 
     # --- Internals ---
+
+    def _enable_prompts(self) -> None:
+        """Send PON to ensure '!' prompts are enabled.
+
+        Bootstrap command -- bypasses _send() because prompts may not
+        yet be enabled. After PON, device will send '!' for all
+        subsequent commands.
+        """
+        if not self._transport.connected:
+            return
+        _LOGGER.debug("TX: PON (bootstrap)")
+        self._transport.write("PON")
+        # Read until we get a prompt or timeout
+        self._wait_for_prompt()
+        if not self._prompt_ready:
+            # No prompt came back -- that's OK, prompts are now enabled
+            # for subsequent commands
+            self._prompt_ready = True
+            _LOGGER.debug("No prompt after PON (expected if prompts were off)")
 
     def _send(self, cmd: str) -> None:
         """Wait for device ready, then send command.
