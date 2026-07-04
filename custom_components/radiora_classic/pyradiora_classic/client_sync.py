@@ -17,11 +17,16 @@ from .exceptions import RadioRAConnectionLost, RadioRATimeoutError
 from .messages import (
     AnyMessage,
     LEDMap,
+    PromptReady,
     VersionInfo,
     ZoneMap,
 )
 from .protocol import MessageParser
 from .transport_sync import SyncTransport
+
+import logging
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class RadioRAClientSync:
@@ -186,10 +191,27 @@ class RadioRAClientSync:
     # --- Internals ---
 
     def _send(self, cmd: str) -> None:
-        """Send command via transport."""
+        """Send command and wait for '!' prompt.
+
+        Per spec 044-038a: device ignores input until it sends '!' prompt.
+        """
         if not self._transport.connected:
             raise RadioRAConnectionLost("Not connected")
+        _LOGGER.debug("TX: %s", cmd)
         self._transport.write(cmd)
+        self._wait_for_prompt()
+
+    def _wait_for_prompt(self) -> None:
+        """Read lines until we see '!' prompt or timeout."""
+        for _ in range(10):
+            line = self._transport.read_line()
+            if line is None:
+                return  # Timeout -- proceed anyway
+            msgs = self._parser.feed((line + "\r").encode("ascii"))
+            for msg in msgs:
+                if isinstance(msg, PromptReady):
+                    return
+        # Exhausted attempts -- proceed anyway
 
     def _read_typed(self, msg_type: type) -> AnyMessage | None:
         """Read lines until we get the expected message type or timeout."""
@@ -200,6 +222,8 @@ class RadioRAClientSync:
                 return None
             msgs = self._parser.feed((line + "\r").encode("ascii"))
             for msg in msgs:
+                if isinstance(msg, PromptReady):
+                    continue  # Skip prompts when looking for data
                 if isinstance(msg, msg_type):
                     return msg
         return None

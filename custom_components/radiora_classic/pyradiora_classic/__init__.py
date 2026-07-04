@@ -24,10 +24,10 @@ from .exceptions import (
 )
 from .messages import (
     AnyMessage,
-    CommandError,
     LEDMap,
     LocalZoneChange,
     MasterButtonPress,
+    PromptReady,
     RadioRAMessage,
     UnknownMessage,
     VersionInfo,
@@ -52,7 +52,7 @@ __all__ = [
     "LEDMap",
     "MasterButtonPress",
     "VersionInfo",
-    "CommandError",
+    "PromptReady",
     "UnknownMessage",
     # Exceptions
     "RadioRAError",

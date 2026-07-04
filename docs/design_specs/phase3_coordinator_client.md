@@ -60,10 +60,19 @@ class RadioRAClientWrapper:
 
 ### Why a Wrapper?
 
-1. **Single import point** — only `client.py` imports from `.pyradiora_classic`. When the library moves to PyPI, one file changes.
+1. **Single import point** — only `client.py` instantiates `RadioRAClient`. When the library moves to PyPI, one file changes.
 2. **Callback bridging** — library uses `Callable[[AnyMessage], None]`; wrapper routes to coordinator's typed handler.
 3. **Future-proofing** — can add command queuing, rate limiting, or retry logic without touching entity code.
 4. **Testability** — mock at this boundary for integration tests.
+
+### Protocol Command Sequencing (Critical)
+
+Per RadioRA Classic spec (044-038a), the device uses software flow control via the `!` prompt:
+- After processing ANY command, the device sends `!\r` to indicate readiness
+- Commands sent before the `!` prompt are **silently ignored**
+- This is handled at the `pyradiora_classic.RadioRAClient` layer (command lock + prompt gating)
+- The HA wrapper does NOT need additional sequencing -- the underlying library guarantees delivery
+- Impact: each command takes ~50ms round-trip (prompt wait). Sequential monitoring setup takes ~200ms total on connect. This is acceptable for RS-232 protocol constraints.
 
 ---
 

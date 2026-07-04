@@ -177,3 +177,8 @@ def disable_monitoring(monitor_type: MonitorType) -> str:
 def flash_on() -> str:
     """Build SFM,16,ON (flash all zones)."""
     return f"SFM,{BUTTON_ALL_ON},ON"
+
+
+def flash_off() -> str:
+    """Build SFM,17,OFF (stop flash)."""
+    return f"SFM,{BUTTON_ALL_OFF},OFF"

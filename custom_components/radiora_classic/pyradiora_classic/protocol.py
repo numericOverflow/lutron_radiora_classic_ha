@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 from .const import ButtonState, System, ZoneState
 from .messages import (
     AnyMessage,
-    CommandError,
     LEDMap,
     LocalZoneChange,
     MasterButtonPress,
+    PromptReady,
     UnknownMessage,
     VersionInfo,
     ZoneMap,
@@ -63,9 +63,9 @@ class MessageParser:
 
         now = datetime.now(timezone.utc)
 
-        # Error response
+        # Ready prompt -- device finished processing previous command
         if line == "!":
-            return CommandError(raw=line, timestamp=now)
+            return PromptReady(raw=line, timestamp=now)
 
         parts = line.split(",")
         verb = parts[0]

@@ -21,10 +21,10 @@ from .const import (
 from .exceptions import RadioRAConnectionLost, RadioRATimeoutError
 from .messages import (
     AnyMessage,
-    CommandError,
     LEDMap,
     LocalZoneChange,
     MasterButtonPress,
+    PromptReady,
     VersionInfo,
     ZoneMap,
 )
@@ -78,6 +78,11 @@ class RadioRAClient:
         # Response waiters (type, future) — only messages matching the type resolve the future
         self._response_waiters: list[tuple[type, asyncio.Future[AnyMessage]]] = []
 
+        # Command sequencing: device ignores input until it sends '!' prompt
+        self._cmd_lock: asyncio.Lock = asyncio.Lock()
+        self._prompt_ready: asyncio.Event = asyncio.Event()
+        self._prompt_ready.set()  # Assume ready initially (first cmd after connect)
+
     # --- Connection Lifecycle ---
 
     async def connect(self) -> None:
@@ -85,6 +90,7 @@ class RadioRAClient:
         self._transport = await AsyncTransport.connect(self._url)
         self._connected_at = datetime.now(timezone.utc)
         self._parser.reset()
+        self._prompt_ready.set()  # Assume ready for first command after connect
 
     async def disconnect(self) -> None:
         """Disconnect and stop all background tasks."""
@@ -311,11 +317,25 @@ class RadioRAClient:
     # --- Internals ---
 
     async def _send(self, cmd: str) -> None:
-        """Send command string with CR terminator."""
+        """Send command and wait for '!' prompt before returning.
+
+        Per spec 044-038a: the device ignores all input until it issues
+        the '!' prompt. We serialize commands with a lock and wait for
+        the prompt after each send to guarantee delivery.
+        """
         if not self._transport or not self._transport.connected:
             raise RadioRAConnectionLost("Not connected")
-        _LOGGER.debug("TX: %s", cmd)
-        await self._transport.write((cmd + "\r").encode(ENCODING))
+        async with self._cmd_lock:
+            self._prompt_ready.clear()
+            _LOGGER.debug("TX: %s", cmd)
+            await self._transport.write((cmd + "\r").encode(ENCODING))
+            # Wait for the '!' prompt (signaled by read loop)
+            try:
+                await asyncio.wait_for(self._prompt_ready.wait(), timeout=_RESPONSE_TIMEOUT)
+            except asyncio.TimeoutError:
+                _LOGGER.debug("No prompt received for: %s (timeout)", cmd)
+                # Don't raise — some scenarios (reconnecting, initial banner)
+                # may not produce a prompt. Allow caller to proceed.
 
     async def _read_loop(self) -> None:
         """Background task: continuously read and dispatch messages."""
@@ -328,6 +348,10 @@ class RadioRAClient:
                 messages = self._parser.feed(data)
                 for msg in messages:
                     self._last_message_at = msg.timestamp
+                    if isinstance(msg, PromptReady):
+                        # Signal command sequencing - don't dispatch to callback
+                        self._prompt_ready.set()
+                        continue
                     self._update_cache(msg)
                     self._resolve_waiters(msg)
                     if self._callback:
@@ -425,6 +449,9 @@ class RadioRAClient:
                 messages = self._parser.feed(data)
                 for msg in messages:
                     self._last_message_at = msg.timestamp
+                    if isinstance(msg, PromptReady):
+                        self._prompt_ready.set()
+                        continue
                     self._update_cache(msg)
                     if self._callback:
                         try:

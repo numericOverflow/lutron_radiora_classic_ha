@@ -92,12 +92,14 @@ class VersionInfo(RadioRAMessage):
 
 
 @dataclass(frozen=True)
-class CommandError(RadioRAMessage):
-    """'!' response — controller did not recognize the command.
+class PromptReady(RadioRAMessage):
+    """'!' response -- device is ready for the next command.
 
-    This is ONLY sent for invalid/unknown commands. Valid commands
-    either return data (ZMPI->ZMP, LMP->LMP, VERI->REV) or return
-    nothing (SDL, SSL, BP, LZCMON, etc. are fire-and-forget).
+    Per spec 044-038a: "Once the Serial Device receives a command, it will
+    ignore all other RS232 inputs until it is finished buffering that command.
+    At that time it will issue an '!' prompt (ASCII 33)."
+
+    This is NOT an error. It signals command completion and readiness.
     """
 
 
@@ -106,13 +108,13 @@ class UnknownMessage(RadioRAMessage):
     """Unrecognized message from controller."""
 
 
-# Union type for callbacks
+# Union type for callbacks (PromptReady excluded -- handled internally by client)
 AnyMessage = (
     LocalZoneChange
     | ZoneMap
     | LEDMap
     | MasterButtonPress
     | VersionInfo
-    | CommandError
+    | PromptReady
     | UnknownMessage
 )
