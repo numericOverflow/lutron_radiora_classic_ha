@@ -1051,24 +1051,11 @@ class RadioRAOptionsFlow(OptionsFlow):
         if user_input is not None:
             selected = [int(z) for z in user_input.get("selected_zones", [])]
             if selected:
-                # Add selected zones with default config
-                existing = list(self._entry.options.get(CONF_ZONES, []))
-                for zone_num in selected:
-                    zone_info = next(
-                        (z for z in self._discovered_new_zones if z["zone"] == zone_num),
-                        None,
-                    )
-                    config: dict[str, Any] = {
-                        "zone": zone_num,
-                        "name": f"Zone {zone_num}",
-                        "mode": "dimmer",
-                        "area": None,
-                        "fade_sec": None,
-                    }
-                    if zone_info and zone_info.get("system"):
-                        config["system"] = zone_info["system"]
-                    existing.append(config)
-                return self._save_options({CONF_ZONES: existing})
+                # Store selections, proceed to naming flow
+                self._rediscover_selected = selected
+                self._rediscover_zone_configs: list[dict[str, Any]] = []
+                self._rediscover_zone_index = 0
+                return await self.async_step_name_rediscovered_zone()
             return await self.async_step_init()
 
         # Build labels — new zones available for selection
@@ -1103,6 +1090,78 @@ class RadioRAOptionsFlow(OptionsFlow):
                 ),
             }),
             description_placeholders={"existing_zones": description_text} if description_text else {},
+        )
+
+    async def async_step_name_rediscovered_zone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Name and configure each rediscovered zone sequentially."""
+        if user_input is not None:
+            zone_num = self._rediscover_selected[self._rediscover_zone_index]
+            # Find system for this zone from discovery
+            system = None
+            for z in self._discovered_new_zones:
+                if z["zone"] == zone_num:
+                    system = z.get("system")
+                    break
+
+            config: dict[str, Any] = {
+                "zone": zone_num,
+                "name": user_input["name"],
+                "mode": user_input.get("mode", "dimmer"),
+                "area": user_input.get("area") or None,
+                "fade_sec": int(user_input["fade_sec"]) if user_input.get("fade_sec") else None,
+            }
+            if system:
+                config["system"] = system
+            self._rediscover_zone_configs.append(config)
+
+            self._rediscover_zone_index += 1
+            if self._rediscover_zone_index < len(self._rediscover_selected):
+                return await self.async_step_name_rediscovered_zone()
+
+            # All zones named — save them
+            existing = list(self._entry.options.get(CONF_ZONES, []))
+            existing.extend(self._rediscover_zone_configs)
+            return self._save_options({CONF_ZONES: existing})
+
+        zone_num = self._rediscover_selected[self._rediscover_zone_index]
+
+        schema: dict[Any, Any] = {
+            vol.Required("name", default=f"Zone {zone_num}"): TextSelector(),
+            vol.Optional("mode", default="dimmer"): SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        {"value": "dimmer", "label": "Dimmer"},
+                        {"value": "onoff", "label": "On/Off Only"},
+                    ],
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Optional("area"): TextSelector(),
+            vol.Optional("fade_sec"): NumberSelector(
+                NumberSelectorConfig(min=0, max=240, mode=NumberSelectorMode.BOX)
+            ),
+        }
+        if self._entry.data.get(CONF_BRIDGED):
+            schema[vol.Optional("system")] = SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        {"value": "1", "label": "System 1"},
+                        {"value": "2", "label": "System 2"},
+                    ],
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            )
+
+        return self.async_show_form(
+            step_id="name_rediscovered_zone",
+            data_schema=vol.Schema(schema),
+            description_placeholders={
+                "zone_number": str(zone_num),
+                "current": str(self._rediscover_zone_index + 1),
+                "total": str(len(self._rediscover_selected)),
+            },
         )
 
     # --- Helpers ---

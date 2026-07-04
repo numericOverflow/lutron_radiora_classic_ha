@@ -205,6 +205,16 @@
         "data": {
           "selected_zones": "New zones to add"
         }
+      },
+      "name_rediscovered_zone": {
+        "title": "Configure Zone {zone_number} ({current}/{total})",
+        "data": {
+          "name": "Name",
+          "mode": "Mode",
+          "area": "Area",
+          "system": "System",
+          "fade_sec": "Fade Time (seconds)"
+        }
       }
     },
     "error": {
