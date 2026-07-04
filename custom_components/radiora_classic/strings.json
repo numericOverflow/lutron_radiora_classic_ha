@@ -62,7 +62,8 @@
           "controller_settings": "Controller Settings",
           "import_csv": "Import CSV",
           "export_csv": "Export CSV",
-          "rediscover_zones": "Re-discover Zones"
+          "rediscover_zones": "Re-discover Zones",
+          "query_firmware_version": "Query Firmware Version"
         }
       },
       "manage_zones": {
@@ -215,6 +216,10 @@
           "system": "System",
           "fade_sec": "Fade Time (seconds)"
         }
+      },
+      "query_firmware_version": {
+        "title": "Firmware Version",
+        "description": "Hardware firmware: **{firmware_version}**"
       }
     },
     "error": {

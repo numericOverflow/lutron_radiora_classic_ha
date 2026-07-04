@@ -131,13 +131,9 @@ class RadioRAClient:
         await self._query_initial_state()
 
     async def stop(self) -> None:
-        """Stop read loop, disable monitoring, disconnect."""
+        """Stop read loop and disconnect (monitoring left on intentionally)."""
         self._stopping = True
         await self.stop_polling()
-        try:
-            await self.stop_monitoring()
-        except (RadioRAConnectionLost, OSError):
-            pass
         await self.disconnect()
 
     @property
@@ -261,12 +257,6 @@ class RadioRAClient:
         await self._send(commands.enable_monitoring(MonitorType.ZONE_CHANGE))
         await self._send(commands.enable_monitoring(MonitorType.BUTTON_PRESS))
         await self._send(commands.enable_monitoring(MonitorType.ZONE_MAP))
-
-    async def stop_monitoring(self) -> None:
-        """Disable all monitoring."""
-        await self._send(commands.disable_monitoring(MonitorType.ZONE_CHANGE))
-        await self._send(commands.disable_monitoring(MonitorType.BUTTON_PRESS))
-        await self._send(commands.disable_monitoring(MonitorType.ZONE_MAP))
 
     # --- State Cache ---
 

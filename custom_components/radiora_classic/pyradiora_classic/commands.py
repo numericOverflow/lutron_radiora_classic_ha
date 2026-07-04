@@ -169,11 +169,6 @@ def enable_monitoring(monitor_type: MonitorType) -> str:
     return f"{monitor_type.value}ON"
 
 
-def disable_monitoring(monitor_type: MonitorType) -> str:
-    """Build monitoring disable command (e.g. LZCMOFF, MBPMOFF, ZMPMOFF)."""
-    return f"{monitor_type.value}OFF"
-
-
 def flash_on() -> str:
     """Build SFM,16,ON (flash all zones)."""
     return f"SFM,{BUTTON_ALL_ON},ON"

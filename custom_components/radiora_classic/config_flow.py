@@ -452,6 +452,7 @@ class RadioRAOptionsFlow(OptionsFlow):
                 "import_csv",
                 "export_csv",
                 "rediscover_zones",
+                "query_firmware_version",
             ],
         )
 
@@ -1164,6 +1165,34 @@ class RadioRAOptionsFlow(OptionsFlow):
                 "current": str(self._rediscover_zone_index + 1),
                 "total": str(len(self._rediscover_selected)),
             },
+        )
+
+    # --- Firmware Version Query ---
+
+    async def async_step_query_firmware_version(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Query and display hardware firmware version."""
+        if user_input is not None:
+            return await self.async_step_init()
+
+        url = self._entry.data[CONF_URL]
+        bridged = self._entry.data.get(CONF_BRIDGED, False)
+        version_str = "Unknown"
+
+        try:
+            client = RadioRAClient(url=url, bridged=bridged)
+            await client.connect()
+            version_info = await client.get_version()
+            version_str = f"{version_info.master_version} / {version_info.slave_version}"
+            await client.disconnect()
+        except (RadioRAConnectionError, RadioRATimeoutError, OSError):
+            version_str = "Error: could not query device"
+
+        return self.async_show_form(
+            step_id="query_firmware_version",
+            data_schema=vol.Schema({}),
+            description_placeholders={"firmware_version": version_str},
         )
 
     # --- Helpers ---

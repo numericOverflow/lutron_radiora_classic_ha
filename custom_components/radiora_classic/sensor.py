@@ -50,6 +50,7 @@ class RadioRAConnectionSensor(CoordinatorEntity[RadioRACoordinator], SensorEntit
             name=f"RadioRA Classic ({controller_id})",
             manufacturer="Lutron",
             model="RA-RS232",
+            sw_version=coordinator.firmware_version,
         )
 
     @property

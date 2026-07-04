@@ -62,6 +62,7 @@ class RadioRACoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._zone_levels: dict[tuple[System, int], int] = {}
         self._phantom_states: dict[int, bool] = {}
         self._master_events: dict[tuple[int, int], datetime] = {}
+        self._firmware_version: str | None = None
 
     # --- Properties ---
 
@@ -84,6 +85,11 @@ class RadioRACoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def controller_id(self) -> str:
         """Controller identifier."""
         return self._controller_id
+
+    @property
+    def firmware_version(self) -> str | None:
+        """Cached firmware version string (e.g. 'M2.29 / S1.0')."""
+        return self._firmware_version
 
     # --- Entity API ---
 
@@ -141,6 +147,8 @@ class RadioRACoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             if not self._client.connected:
                 await self._client.start()
+                # Query firmware version on first connect
+                await self._query_firmware_version()
 
             # Query zone map (reconciliation heartbeat)
             zone_maps = await self._client.get_zone_map()
@@ -167,6 +175,17 @@ class RadioRACoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Called by HA on entry unload or stop."""
         await super().async_shutdown()
         await self._client.stop()
+
+    async def _query_firmware_version(self) -> None:
+        """Query and cache firmware version (non-fatal on failure)."""
+        try:
+            version_info = await self._client.get_version()
+            self._firmware_version = (
+                f"{version_info.master_version} / {version_info.slave_version}"
+            )
+            _LOGGER.debug("Firmware version: %s", self._firmware_version)
+        except (RadioRATimeoutError, RadioRAConnectionLost):
+            _LOGGER.debug("Firmware version query failed")
 
     # --- Push Message Handling ---
 
