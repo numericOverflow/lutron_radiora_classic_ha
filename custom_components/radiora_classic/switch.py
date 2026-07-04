@@ -58,6 +58,7 @@ class RadioRAPhantomSwitch(CoordinatorEntity[RadioRACoordinator], SwitchEntity):
             name=button_config["name"],
             manufacturer="Lutron",
             model="RadioRA Classic Phantom Button",
+            hw_version=f"Button {self._button}",
         )
         if button_config.get("area"):
             self._attr_device_info["suggested_area"] = button_config["area"]

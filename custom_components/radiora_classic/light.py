@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_TRANSITION,
@@ -70,14 +72,32 @@ class RadioRALight(CoordinatorEntity[RadioRACoordinator], LightEntity):
         # Entity identification
         system_prefix = f"s{self._system.value}." if self._system != System.NONE else ""
         self._attr_unique_id = f"radiora_classic.{controller_id}.{system_prefix}light.z{self._zone}"
+        model = "RadioRA Classic Dimmer" if self._mode == "dimmer" else "RadioRA Classic Switch"
+        hw_version = f"Zone {self._zone}"
+        if self._system != System.NONE:
+            hw_version += f" · S{self._system.value}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{controller_id}.{system_prefix}light.z{self._zone}")},
             name=zone_config["name"],
             manufacturer="Lutron",
-            model="RadioRA Classic Zone",
+            model=model,
+            hw_version=hw_version,
         )
         if zone_config.get("area"):
             self._attr_device_info["suggested_area"] = zone_config["area"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose zone config as entity attributes."""
+        attrs: dict[str, Any] = {
+            "zone_number": self._zone,
+            "mode": self._mode,
+        }
+        if self._fade_sec is not None:
+            attrs["fade_time_seconds"] = self._fade_sec
+        if self._system != System.NONE:
+            attrs["system"] = self._system.value
+        return attrs
 
     @property
     def brightness(self) -> int | None:

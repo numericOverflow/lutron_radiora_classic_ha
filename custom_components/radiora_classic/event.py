@@ -63,6 +63,7 @@ class RadioRAMasterEvent(CoordinatorEntity[RadioRACoordinator], EventEntity):
             name=mc_config["name"],
             manufacturer="Lutron",
             model="RadioRA Classic Master Control",
+            hw_version=f"MC{self._master} Button {self._button}",
         )
         if mc_config.get("area"):
             self._attr_device_info["suggested_area"] = mc_config["area"]
