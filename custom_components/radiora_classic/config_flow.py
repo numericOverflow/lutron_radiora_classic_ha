@@ -15,6 +15,8 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    AreaSelector,
+    AreaSelectorConfig,
     BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
@@ -255,7 +257,7 @@ class RadioRAClassicConfigFlow(ConfigFlow, domain=DOMAIN):
                         mode=SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                vol.Optional("area"): TextSelector(),
+                vol.Optional("area"): AreaSelector(),
                 vol.Optional("fade_sec"): NumberSelector(
                     NumberSelectorConfig(min=0, max=240, mode=NumberSelectorMode.BOX)
                 ),
@@ -503,7 +505,7 @@ class RadioRAOptionsFlow(OptionsFlow):
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
-            vol.Optional("area"): TextSelector(),
+            vol.Optional("area"): AreaSelector(),
             vol.Optional("fade_sec"): NumberSelector(
                 NumberSelectorConfig(min=0, max=240, mode=NumberSelectorMode.BOX)
             ),
@@ -593,7 +595,7 @@ class RadioRAOptionsFlow(OptionsFlow):
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
-            vol.Optional("area", default=current.get("area") or ""): TextSelector(),
+            vol.Optional("area", default=current.get("area") or ""): AreaSelector(),
             vol.Optional(
                 "fade_sec", default=current.get("fade_sec")
             ): NumberSelector(
@@ -681,7 +683,7 @@ class RadioRAOptionsFlow(OptionsFlow):
                     NumberSelectorConfig(min=1, max=15, mode=NumberSelectorMode.BOX)
                 ),
                 vol.Required("name"): TextSelector(),
-                vol.Optional("area"): TextSelector(),
+                vol.Optional("area"): AreaSelector(),
             }),
             errors=errors,
         )
@@ -735,7 +737,7 @@ class RadioRAOptionsFlow(OptionsFlow):
             step_id="edit_phantom",
             data_schema=vol.Schema({
                 vol.Required("name", default=current["name"]): TextSelector(),
-                vol.Optional("area", default=current.get("area") or ""): TextSelector(),
+                vol.Optional("area", default=current.get("area") or ""): AreaSelector(),
             }),
         )
 
@@ -812,7 +814,7 @@ class RadioRAOptionsFlow(OptionsFlow):
                     NumberSelectorConfig(min=1, max=99, mode=NumberSelectorMode.BOX)
                 ),
                 vol.Required("name"): TextSelector(),
-                vol.Optional("area"): TextSelector(),
+                vol.Optional("area"): AreaSelector(),
             }),
             errors=errors,
         )
@@ -878,7 +880,7 @@ class RadioRAOptionsFlow(OptionsFlow):
             step_id="edit_master",
             data_schema=vol.Schema({
                 vol.Required("name", default=current["name"]): TextSelector(),
-                vol.Optional("area", default=current.get("area") or ""): TextSelector(),
+                vol.Optional("area", default=current.get("area") or ""): AreaSelector(),
             }),
         )
 
@@ -1138,7 +1140,7 @@ class RadioRAOptionsFlow(OptionsFlow):
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
-            vol.Optional("area"): TextSelector(),
+            vol.Optional("area"): AreaSelector(),
             vol.Optional("fade_sec"): NumberSelector(
                 NumberSelectorConfig(min=0, max=240, mode=NumberSelectorMode.BOX)
             ),
