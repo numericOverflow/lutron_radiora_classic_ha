@@ -519,10 +519,17 @@ class RadioRAOptionsFlow(OptionsFlow):
                 )
             )
 
+        # Show existing zones in description for context
+        existing = self._entry.options.get(CONF_ZONES, [])
+        existing_summary = ", ".join(
+            f"{z['zone']}={z['name']}" for z in sorted(existing, key=lambda x: x["zone"])
+        )
+
         return self.async_show_form(
             step_id="add_zone",
             data_schema=vol.Schema(schema),
             errors=errors,
+            description_placeholders={"configured_zones": existing_summary} if existing_summary else {},
         )
 
     async def async_step_select_edit_zone(
@@ -1011,9 +1018,10 @@ class RadioRAOptionsFlow(OptionsFlow):
                 errors=errors,
             )
 
-        # Filter out already-configured zones
-        existing_nums = {z["zone"] for z in self._entry.options.get(CONF_ZONES, [])}
-        new_zones = [z for z in discovered if z["zone"] not in existing_nums]
+        # Build zone list with existing names annotated
+        existing_zones = {z["zone"]: z for z in self._entry.options.get(CONF_ZONES, [])}
+        all_discovered = discovered
+        new_zones = [z for z in discovered if z["zone"] not in existing_zones]
 
         if not new_zones:
             errors["base"] = "no_zones_found"
@@ -1023,16 +1031,22 @@ class RadioRAOptionsFlow(OptionsFlow):
                 errors=errors,
             )
 
-        return await self.async_step_rediscover_results(new_zones=new_zones)
+        # Pass both new zones and existing lookup to results step
+        return await self.async_step_rediscover_results(
+            new_zones=new_zones, existing_zones=existing_zones
+        )
 
     async def async_step_rediscover_results(
         self,
         user_input: dict[str, Any] | None = None,
         new_zones: list[dict[str, Any]] | None = None,
+        existing_zones: dict[int, dict[str, Any]] | None = None,
     ) -> ConfigFlowResult:
-        """Show discovered zones for selection."""
+        """Show discovered zones for selection, annotating already-configured ones."""
         if new_zones is not None:
             self._discovered_new_zones = new_zones
+        if existing_zones is not None:
+            self._existing_zones_lookup = existing_zones
 
         if user_input is not None:
             selected = [int(z) for z in user_input.get("selected_zones", [])]
@@ -1057,14 +1071,28 @@ class RadioRAOptionsFlow(OptionsFlow):
                 return self._save_options({CONF_ZONES: existing})
             return await self.async_step_init()
 
-        options = [
-            {
-                "value": str(z["zone"]),
-                "label": f"Zone {z['zone']} — {'ON' if z['is_on'] else 'OFF'}"
-                + (f" (S{z['system']})" if z.get("system") else ""),
-            }
-            for z in self._discovered_new_zones
-        ]
+        # Build labels — new zones available for selection
+        existing_lookup = getattr(self, "_existing_zones_lookup", {})
+        options = []
+        for z in self._discovered_new_zones:
+            label = f"Zone {z['zone']} — {'ON' if z['is_on'] else 'OFF'}"
+            if z.get("system"):
+                label += f" (S{z['system']})"
+            options.append({"value": str(z["zone"]), "label": label})
+
+        # Build description showing already-configured zones for context
+        configured_lines = []
+        for zone_num, zone_cfg in sorted(existing_lookup.items()):
+            state_hint = "configured"
+            configured_lines.append(f"Zone {zone_num}: {zone_cfg['name']} ✓")
+
+        description_text = ""
+        if configured_lines:
+            description_text = (
+                "Already configured:\n" + "\n".join(configured_lines)
+                + "\n\nSelect new zones to add:"
+            )
+
         return self.async_show_form(
             step_id="rediscover_results",
             data_schema=vol.Schema({
@@ -1074,6 +1102,7 @@ class RadioRAOptionsFlow(OptionsFlow):
                     )
                 ),
             }),
+            description_placeholders={"existing_zones": description_text} if description_text else {},
         )
 
     # --- Helpers ---
