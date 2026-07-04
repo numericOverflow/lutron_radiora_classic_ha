@@ -317,25 +317,24 @@ class RadioRAClient:
     # --- Internals ---
 
     async def _send(self, cmd: str) -> None:
-        """Send command and wait for '!' prompt before returning.
+        """Wait for device ready, then send command.
 
         Per spec 044-038a: the device ignores all input until it issues
-        the '!' prompt. We serialize commands with a lock and wait for
-        the prompt after each send to guarantee delivery.
+        the '!' prompt from the previous command. We gate writes on the
+        prompt and serialize with a lock. Returns immediately after sending
+        (does NOT wait for this command's '!' -- that gates the NEXT send).
         """
         if not self._transport or not self._transport.connected:
             raise RadioRAConnectionLost("Not connected")
         async with self._cmd_lock:
-            self._prompt_ready.clear()
-            _LOGGER.debug("TX: %s", cmd)
-            await self._transport.write((cmd + "\r").encode(ENCODING))
-            # Wait for the '!' prompt (signaled by read loop)
+            # Wait for device to be ready (! from previous command)
             try:
                 await asyncio.wait_for(self._prompt_ready.wait(), timeout=_RESPONSE_TIMEOUT)
             except asyncio.TimeoutError:
-                _LOGGER.debug("No prompt received for: %s (timeout)", cmd)
-                # Don't raise — some scenarios (reconnecting, initial banner)
-                # may not produce a prompt. Allow caller to proceed.
+                _LOGGER.debug("Prompt not ready before send: %s (proceeding anyway)", cmd)
+            self._prompt_ready.clear()
+            _LOGGER.debug("TX: %s", cmd)
+            await self._transport.write((cmd + "\r").encode(ENCODING))
 
     async def _read_loop(self) -> None:
         """Background task: continuously read and dispatch messages."""

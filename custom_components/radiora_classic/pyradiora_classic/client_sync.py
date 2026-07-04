@@ -41,6 +41,7 @@ class RadioRAClientSync:
         self._bridged = bridged
         self._transport = SyncTransport(url, timeout)
         self._parser = MessageParser()
+        self._prompt_ready = True  # Assume ready for first command
 
     # --- Connection ---
 
@@ -191,15 +192,19 @@ class RadioRAClientSync:
     # --- Internals ---
 
     def _send(self, cmd: str) -> None:
-        """Send command and wait for '!' prompt.
+        """Wait for device ready, then send command.
 
-        Per spec 044-038a: device ignores input until it sends '!' prompt.
+        Per spec 044-038a: device ignores input until it sends '!' prompt
+        from previous command. We gate writes on the prompt. Returns
+        immediately after sending (does not wait for this command's !).
         """
         if not self._transport.connected:
             raise RadioRAConnectionLost("Not connected")
+        if not self._prompt_ready:
+            self._wait_for_prompt()
+        self._prompt_ready = False
         _LOGGER.debug("TX: %s", cmd)
         self._transport.write(cmd)
-        self._wait_for_prompt()
 
     def _wait_for_prompt(self) -> None:
         """Read lines until we see '!' prompt or timeout."""
@@ -210,6 +215,7 @@ class RadioRAClientSync:
             msgs = self._parser.feed((line + "\r").encode("ascii"))
             for msg in msgs:
                 if isinstance(msg, PromptReady):
+                    self._prompt_ready = True
                     return
         # Exhausted attempts -- proceed anyway
 
