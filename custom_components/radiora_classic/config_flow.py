@@ -33,11 +33,13 @@ from homeassistant.util import slugify
 from .const import (
     CONF_BRIDGED,
     CONF_CONTROLLER_ID,
+    CONF_DEBUG_LOGGING,
     CONF_POLL_INTERVAL,
     CONF_URL,
     CONF_ZONES,
     CONF_PHANTOM_BUTTONS,
     CONF_MASTER_CONTROLS,
+    DEFAULT_DEBUG_LOGGING,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     MAX_CSV_ROWS,
@@ -1068,15 +1070,24 @@ class RadioRAOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self._save_options({
                 CONF_POLL_INTERVAL: int(user_input["poll_interval"]),
+                CONF_DEBUG_LOGGING: bool(
+                    user_input.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING)
+                ),
             })
 
         current_interval = self._entry.options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
+        current_debug = self._entry.options.get(
+            CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING
+        )
         return self.async_show_form(
             step_id="controller_settings",
             data_schema=vol.Schema({
                 vol.Required("poll_interval", default=current_interval): NumberSelector(
                     NumberSelectorConfig(min=0, max=86400, mode=NumberSelectorMode.BOX)
                 ),
+                vol.Required(
+                    CONF_DEBUG_LOGGING, default=current_debug
+                ): BooleanSelector(),
             }),
         )
 

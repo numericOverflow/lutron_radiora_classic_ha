@@ -200,10 +200,12 @@
       "controller_settings": {
         "title": "Controller Settings",
         "data": {
-          "poll_interval": "Poll Interval (seconds)"
+          "poll_interval": "Poll Interval (seconds)",
+          "debug_logging": "Enable debug logging (RX/TX)"
         },
         "data_description": {
-          "poll_interval": "Reconciliation heartbeat. 0 = disabled (push only)."
+          "poll_interval": "Reconciliation heartbeat. 0 = disabled (push only).",
+          "debug_logging": "Logs every serial command sent and received to home-assistant.log. Verbose \u2014 use only when troubleshooting. Equivalent to setting this integration's logger to Debug in Settings \u2192 System \u2192 Logs."
         }
       },
       "import_csv": {
