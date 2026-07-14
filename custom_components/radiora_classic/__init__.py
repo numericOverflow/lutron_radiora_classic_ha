@@ -13,8 +13,10 @@ from homeassistant.helpers import device_registry as dr
 from .const import (
     CONF_BRIDGED,
     CONF_CONTROLLER_ID,
+    CONF_DEBUG_LOGGING,
     CONF_POLL_INTERVAL,
     CONF_URL,
+    DEFAULT_DEBUG_LOGGING,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
 )
@@ -33,9 +35,30 @@ PLATFORMS = [
     Platform.SENSOR,
 ]
 
+# Root logger for the whole integration. Child loggers (including the vendored
+# `pyradiora_classic.*` subpackage) inherit its effective level via the standard
+# Python logging hierarchy. Kept in sync with manifest.json "loggers".
+_INTEGRATION_LOGGER_NAME = "custom_components.radiora_classic"
+
+
+def _apply_debug_logging(enabled: bool) -> None:
+    """Force DEBUG on the integration logger tree, or release it to inherit.
+
+    Setting NOTSET (not INFO) when disabled preserves any user override made
+    via the HA "Settings → System → Logs" UI or a `logger:` YAML block.
+    """
+    level = logging.DEBUG if enabled else logging.NOTSET
+    logging.getLogger(_INTEGRATION_LOGGER_NAME).setLevel(level)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: RadioRAConfigEntry) -> bool:
     """Set up RadioRA Classic from a config entry."""
+    # Apply the debug-logging preference BEFORE the coordinator starts so that
+    # the initial PON bootstrap and first RX/TX lines are captured when enabled.
+    _apply_debug_logging(
+        entry.options.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING)
+    )
+
     url = entry.data[CONF_URL]
     bridged = entry.data.get(CONF_BRIDGED, False)
     controller_id = entry.options[CONF_CONTROLLER_ID]
